@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, mem};
+use std::mem;
 
 use rand::Rng;
 use wyhash::wyhash;
@@ -8,7 +8,7 @@ use crate::buffer::Buffer;
 pub struct HashSet {
     seed: u64,
     data: Data,
-    offsets: BTreeMap<u64, usize>,
+    offsets: Vec<(u64, usize)>,
 }
 
 impl HashSet {
@@ -23,16 +23,22 @@ impl HashSet {
     {
         let data = Data::new(keys, len, total_size);
         let mut rng = rand::thread_rng();
-        let mut offsets = BTreeMap::new();
+        let mut offsets = Vec::new();
         'tries: for _ in 0..max_num_tries {
             let seed: u64 = rng.gen();
 
             for (offset, key) in data.iter() {
-                if offsets.insert(wyhash(key, seed), offset).is_some() {
+                let hash = wyhash(key, seed);
+                if offsets.iter().any(|(h, _)| *h == hash) {
                     offsets.clear();
                     continue 'tries;
+                } else {
+                    offsets.push((hash, offset));
                 }
             }
+
+            offsets.sort();
+            offsets.shrink_to_fit();
 
             return Some(Self {
                 seed,
@@ -45,11 +51,14 @@ impl HashSet {
     }
 
     pub fn contains(&self, key: &[u8]) -> bool {
-        let offset = match self.offsets.get(&wyhash(key, self.seed)) {
-            Some(offset) => offset,
-            None => return false,
+        let offset = match self
+            .offsets
+            .binary_search_by_key(&wyhash(key, self.seed), |(h, _)| *h)
+        {
+            Ok(idx) => self.offsets[idx].1,
+            Err(_) => return false,
         };
-        let res = match self.data.get(*offset) {
+        let res = match self.data.get(offset) {
             Some(res) => res,
             None => return false,
         };
