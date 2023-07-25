@@ -1,4 +1,4 @@
-use std::mem;
+use std::{collections::BTreeMap, mem};
 
 use rand::Rng;
 use wyhash::wyhash;
@@ -23,19 +23,19 @@ impl HashSet {
     {
         let data = Data::new(keys, len, total_size);
         let mut rng = rand::thread_rng();
-        let mut offsets = Vec::new();
+        let mut offsets = BTreeMap::<u64, usize>::new();
         'tries: for _ in 0..max_num_tries {
             let seed: u64 = rng.gen();
 
             for (offset, key) in data.iter() {
                 let hash = wyhash(key, seed);
-                if offsets.iter().any(|(h, _)| *h == hash) {
+                if offsets.insert(hash, offset).is_some() {
                     offsets.clear();
                     continue 'tries;
-                } else {
-                    offsets.push((hash, offset));
                 }
             }
+
+            let mut offsets = offsets.into_iter().collect::<Vec<_>>();
 
             offsets.sort();
             offsets.shrink_to_fit();
