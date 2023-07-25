@@ -37,10 +37,6 @@ impl<T> Buffer<T> {
     pub(crate) fn as_slice(&self) -> &[T] {
         unsafe { slice::from_raw_parts(self.ptr as *const T, self.len) }
     }
-
-    pub(crate) fn len(&self) -> usize {
-        self.len
-    }
 }
 
 impl<T> Drop for Buffer<T> {
