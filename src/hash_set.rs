@@ -8,7 +8,8 @@ use crate::buffer::Buffer;
 pub struct HashSet {
     seed: u64,
     data: Data,
-    offsets: Vec<(u64, usize)>,
+    hashes: Vec<u64>,
+    offsets: Vec<usize>,
 }
 
 impl HashSet {
@@ -23,26 +24,34 @@ impl HashSet {
     {
         let data = Data::new(keys, len, total_size);
         let mut rng = rand::thread_rng();
-        let mut offsets = BTreeMap::<u64, usize>::new();
+        let mut tuples = BTreeMap::<u64, usize>::new();
         'tries: for _ in 0..max_num_tries {
             let seed: u64 = rng.gen();
 
             for (offset, key) in data.iter() {
                 let hash = wyhash(key, seed);
-                if offsets.insert(hash, offset).is_some() {
-                    offsets.clear();
+                if tuples.insert(hash, offset).is_some() {
+                    tuples.clear();
                     continue 'tries;
                 }
             }
 
-            let mut offsets = offsets.into_iter().collect::<Vec<_>>();
+            let mut tuples = tuples.into_iter().collect::<Vec<_>>();
 
-            offsets.sort();
-            offsets.shrink_to_fit();
+            tuples.sort_unstable_by_key(|v| v.0);
+
+            let mut hashes = Vec::with_capacity(tuples.len());
+            let mut offsets = Vec::with_capacity(tuples.len());
+
+            for (hash, offset) in tuples.into_iter() {
+                hashes.push(hash);
+                offsets.push(offset);
+            }
 
             return Some(Self {
                 seed,
                 data,
+                hashes,
                 offsets,
             });
         }
@@ -51,11 +60,8 @@ impl HashSet {
     }
 
     pub fn contains(&self, key: &[u8]) -> bool {
-        let offset = match self
-            .offsets
-            .binary_search_by_key(&wyhash(key, self.seed), |(h, _)| *h)
-        {
-            Ok(idx) => self.offsets[idx].1,
+        let offset = match self.hashes.binary_search(&wyhash(key, self.seed)) {
+            Ok(idx) => self.offsets[idx],
             Err(_) => return false,
         };
         let res = match self.data.get(offset) {
