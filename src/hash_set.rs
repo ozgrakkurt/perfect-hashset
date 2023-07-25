@@ -93,7 +93,7 @@ impl Data {
         }
 
         assert_eq!(i, len);
-        assert_eq!(offset, total_size);
+        assert_eq!(offset, total_size + len * mem::size_of::<usize>());
 
         Self { offsets, data }
     }
