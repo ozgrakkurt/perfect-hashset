@@ -23,12 +23,13 @@ impl HashSet {
     {
         let data = Data::new(keys, len, total_size);
         let mut rng = rand::thread_rng();
+        let mut offsets = BTreeMap::new();
         'tries: for _ in 0..max_num_tries {
             let seed: u64 = rng.gen();
-            let mut offsets = BTreeMap::new();
 
             for (offset, key) in data.iter() {
                 if offsets.insert(wyhash(key, seed), offset).is_some() {
+                    offsets.clear();
                     continue 'tries;
                 }
             }
