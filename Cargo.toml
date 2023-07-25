@@ -1,0 +1,9 @@
+[package]
+name = "perfect-hashset"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+fastrange-rs = "0.1"
+wyhash = "0.5"
+anyhow = "1"
