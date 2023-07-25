@@ -8,7 +8,7 @@ use crate::buffer::Buffer;
 pub struct HashSet {
     seed: u64,
     data: Data,
-    offsets: Vec<(u64, usize)>,
+    offsets: Vec<(u32, usize)>,
 }
 
 impl HashSet {
@@ -23,12 +23,12 @@ impl HashSet {
     {
         let data = Data::new(keys, len, total_size);
         let mut rng = rand::thread_rng();
-        let mut offsets = BTreeMap::<u64, usize>::new();
+        let mut offsets = BTreeMap::<u32, usize>::new();
         'tries: for _ in 0..max_num_tries {
             let seed: u64 = rng.gen();
 
             for (offset, key) in data.iter() {
-                let hash = wyhash(key, seed);
+                let hash = wyhash(key, seed) as u32;
                 if offsets.insert(hash, offset).is_some() {
                     offsets.clear();
                     continue 'tries;
@@ -53,7 +53,7 @@ impl HashSet {
     pub fn contains(&self, key: &[u8]) -> bool {
         let offset = match self
             .offsets
-            .binary_search_by_key(&wyhash(key, self.seed), |(h, _)| *h)
+            .binary_search_by_key(&(wyhash(key, self.seed) as u32), |(h, _)| *h)
         {
             Ok(idx) => self.offsets[idx].1,
             Err(_) => return false,
