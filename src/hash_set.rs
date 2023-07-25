@@ -22,7 +22,7 @@ impl HashSet {
     {
         let mut data = Data::new(keys, len, total_size);
 
-        let mut occupancy_vec = BitVec::with_capacity(len);
+        let mut occupancy_vec = BitVec::from_elem(len, false);
 
         let mut rng = rand::thread_rng();
         'tries: for _ in 0..max_num_tries {
