@@ -1,4 +1,8 @@
-use std::{alloc::{Layout, alloc_zeroed, dealloc}, mem, slice, marker::PhantomData};
+use std::{
+    alloc::{alloc_zeroed, dealloc, Layout},
+    marker::PhantomData,
+    mem, slice,
+};
 
 const ALIGNMENT: usize = 64;
 
@@ -18,19 +22,24 @@ impl<T> Buffer<T> {
         let layout = Layout::from_size_align(padded_size, ALIGNMENT).unwrap();
         let ptr = unsafe { alloc_zeroed(layout) };
 
-        Self { layout, ptr, len, phantom: PhantomData }
+        Self {
+            layout,
+            ptr,
+            len,
+            phantom: PhantomData,
+        }
     }
 
     pub(crate) fn as_mut(&mut self) -> &mut [T] {
-        unsafe {
-            slice::from_raw_parts_mut(self.ptr as *mut T, self.len)
-        }
+        unsafe { slice::from_raw_parts_mut(self.ptr as *mut T, self.len) }
     }
 
     pub(crate) fn as_slice(&self) -> &[T] {
-        unsafe {
-            slice::from_raw_parts(self.ptr as *const T, self.len)
-        }
+        unsafe { slice::from_raw_parts(self.ptr as *const T, self.len) }
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.len
     }
 }
 

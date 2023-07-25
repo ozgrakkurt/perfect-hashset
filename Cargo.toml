@@ -5,5 +5,6 @@ edition = "2021"
 
 [dependencies]
 fastrange-rs = "0.1"
+rand = "0.8"
 wyhash = "0.5"
-anyhow = "1"
+bit-vec = "0.6"
