@@ -8,3 +8,4 @@ fastrange-rs = "0.1"
 rand = "0.8"
 wyhash = "0.5"
 roaring = "0.10"
+lz4_flex = { version = "0.11", default-features = false }

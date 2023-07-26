@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, mem};
 
+use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 use rand::Rng;
 use wyhash::wyhash;
 
@@ -70,6 +71,18 @@ impl HashSet {
         };
         res == key
     }
+
+    pub fn compress(self) -> CompressedHashSet {
+        let compressed = compress_prepend_size(self.data.data.as_slice());
+        let buf = Buffer::new(compressed.len());
+
+        CompressedHashSet {
+            seed: self.seed,
+            data: Data { data: buf },
+            hashes: self.hashes,
+            offsets: self.offsets,
+        }
+    }
 }
 
 struct Data {
@@ -102,11 +115,7 @@ impl Data {
     }
 
     fn get(&self, offset: usize) -> Option<&[u8]> {
-        let base = offset + mem::size_of::<usize>();
-        let size = self.data.as_slice().get(offset..base)?;
-        let size = usize::from_ne_bytes(size.try_into().unwrap());
-
-        self.data.as_slice().get(base..base + size)
+        get_with_offset(self.data.as_slice(), offset)
     }
 
     fn iter(&self) -> DataIter {
@@ -115,6 +124,14 @@ impl Data {
             offset: 0,
         }
     }
+}
+
+fn get_with_offset(buf: &[u8], offset: usize) -> Option<&[u8]> {
+    let base = offset + mem::size_of::<usize>();
+    let size = buf.get(offset..base)?;
+    let size = usize::from_ne_bytes(size.try_into().unwrap());
+
+    buf.get(base..base + size)
 }
 
 struct DataIter<'a> {
@@ -135,5 +152,29 @@ impl<'a> Iterator for DataIter<'a> {
         self.offset = base + size;
 
         Some((offset, self.data.get(base..base + size)?))
+    }
+}
+
+pub struct CompressedHashSet {
+    seed: u64,
+    data: Data,
+    hashes: Vec<u64>,
+    offsets: Vec<usize>,
+}
+
+impl CompressedHashSet {
+    pub fn contains(&self, key: &[u8]) -> bool {
+        let offset = match self.hashes.binary_search(&wyhash(key, self.seed)) {
+            Ok(idx) => self.offsets[idx],
+            Err(_) => return false,
+        };
+
+        let data = decompress_size_prepended(self.data.data.as_slice()).unwrap();
+
+        let res = match get_with_offset(data.as_slice(), offset) {
+            Some(res) => res,
+            None => return false,
+        };
+        res == key
     }
 }
