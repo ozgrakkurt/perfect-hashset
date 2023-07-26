@@ -74,7 +74,8 @@ impl HashSet {
 
     pub fn compress(self) -> CompressedHashSet {
         let compressed = compress_prepend_size(self.data.data.as_slice());
-        let buf = Buffer::new(compressed.len());
+        let mut buf = Buffer::new(compressed.len());
+        buf.as_mut().copy_from_slice(compressed.as_slice());
 
         CompressedHashSet {
             seed: self.seed,
