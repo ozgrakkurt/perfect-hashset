@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, mem};
 
 use lz4_flex::{compress_prepend_size, decompress_size_prepended};
+use sbbf_rs_safe::Filter;
 use wyhash::wyhash;
 
 use crate::buffer::Buffer;
@@ -10,6 +11,7 @@ pub struct HashSet {
     data: Data,
     hashes: Vec<u64>,
     offsets: Vec<usize>,
+    filter: Filter,
 }
 
 impl HashSet {
@@ -25,6 +27,8 @@ impl HashSet {
         let data = Data::new(keys, len, total_size);
         let mut rand_seed = 0;
         let mut tuples = BTreeMap::<u64, usize>::new();
+        let mut filter = Filter::new(8, len);
+
         'tries: for _ in 0..max_num_tries {
             let seed: u64 = wyhash::wyrng(&mut rand_seed);
 
@@ -34,6 +38,7 @@ impl HashSet {
                     tuples.clear();
                     continue 'tries;
                 }
+                filter.insert_hash(hash);
             }
 
             let mut tuples = tuples.into_iter().collect::<Vec<_>>();
@@ -53,22 +58,11 @@ impl HashSet {
                 data,
                 hashes,
                 offsets,
+                filter,
             });
         }
 
         None
-    }
-
-    pub fn contains(&self, key: &[u8]) -> bool {
-        let offset = match self.hashes.binary_search(&wyhash(key, self.seed)) {
-            Ok(idx) => self.offsets[idx],
-            Err(_) => return false,
-        };
-        let res = match self.data.get(offset) {
-            Some(res) => res,
-            None => return false,
-        };
-        res == key
     }
 
     pub fn compress(self) -> CompressedHashSet {
@@ -81,6 +75,7 @@ impl HashSet {
             data: Data { data: buf },
             hashes: self.hashes,
             offsets: self.offsets,
+            filter: self.filter,
         }
     }
 }
@@ -112,10 +107,6 @@ impl Data {
         assert_eq!(offset, total_size + len * mem::size_of::<usize>());
 
         Self { data }
-    }
-
-    fn get(&self, offset: usize) -> Option<&[u8]> {
-        get_with_offset(self.data.as_slice(), offset)
     }
 
     fn iter(&self) -> DataIter {
@@ -160,11 +151,18 @@ pub struct CompressedHashSet {
     data: Data,
     hashes: Vec<u64>,
     offsets: Vec<usize>,
+    filter: Filter,
 }
 
 impl CompressedHashSet {
     pub fn contains(&self, key: &[u8]) -> bool {
-        let offset = match self.hashes.binary_search(&wyhash(key, self.seed)) {
+        let hash = wyhash(key, self.seed);
+
+        if !self.filter.contains_hash(hash) {
+            return false;
+        }
+
+        let offset = match self.hashes.binary_search(&hash) {
             Ok(idx) => self.offsets[idx],
             Err(_) => return false,
         };
