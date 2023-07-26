@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, mem};
 
 use lz4_flex::{compress_prepend_size, decompress_size_prepended};
-use rand::Rng;
 use wyhash::wyhash;
 
 use crate::buffer::Buffer;
@@ -24,10 +23,10 @@ impl HashSet {
         Keys: Iterator<Item = &'input [u8]>,
     {
         let data = Data::new(keys, len, total_size);
-        let mut rng = rand::thread_rng();
+        let mut rand_seed = 0;
         let mut tuples = BTreeMap::<u64, usize>::new();
         'tries: for _ in 0..max_num_tries {
-            let seed: u64 = rng.gen();
+            let seed: u64 = wyhash::wyrng(&mut rand_seed);
 
             for (offset, key) in data.iter() {
                 let hash = wyhash(key, seed);
